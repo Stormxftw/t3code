@@ -974,6 +974,10 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
   onAddTerminalContext,
 }: PersistentThreadTerminalDrawerProps) {
   const canOperateTerminal = useEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope);
+  const hasTerminalWriteAccess = useCallback(
+    () => readEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope),
+    [threadRef.environmentId],
+  );
   const openTerminal = useAtomCommand(terminalEnvironment.open, "terminal open");
   const writeTerminal = useAtomCommand(terminalEnvironment.write, "terminal write");
   const closeTerminalMutation = useAtomCommand(terminalEnvironment.close, "terminal close");
@@ -1075,9 +1079,12 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
     () =>
       nextTerminalId(
         allocatableTerminalIds,
-        knownTerminalSessions === null ? randomUUID() : undefined,
+        knownTerminalSessions === null ||
+          !readEnvironmentScope(threadRef.environmentId, AuthTerminalReadScope)
+          ? randomUUID()
+          : undefined,
       ),
-    [allocatableTerminalIds, knownTerminalSessions],
+    [allocatableTerminalIds, knownTerminalSessions, threadRef.environmentId],
   );
   const storeSetTerminalHeight = useTerminalUiStateStore((state) => state.setTerminalHeight);
   const storeSplitTerminal = useTerminalUiStateStore((state) => state.splitTerminal);
@@ -1145,7 +1152,7 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
   );
 
   const splitTerminal = useCallback(() => {
-    if (!canOperateTerminal || !cwd) {
+    if (!hasTerminalWriteAccess() || !cwd) {
       return;
     }
     const terminalId = allocateTerminalId();
@@ -1171,10 +1178,10 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
     threadId,
     threadRef,
     openTerminal,
-    canOperateTerminal,
+    hasTerminalWriteAccess,
   ]);
   const splitTerminalVertical = useCallback(() => {
-    if (!canOperateTerminal || !cwd) {
+    if (!hasTerminalWriteAccess() || !cwd) {
       return;
     }
     const terminalId = allocateTerminalId();
@@ -1196,7 +1203,7 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
     cwd,
     effectiveWorktreePath,
     openTerminal,
-    canOperateTerminal,
+    hasTerminalWriteAccess,
     runtimeEnv,
     storeSplitTerminalVertical,
     threadId,
@@ -1204,7 +1211,7 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
   ]);
 
   const createNewTerminal = useCallback(() => {
-    if (!canOperateTerminal || !cwd) {
+    if (!hasTerminalWriteAccess() || !cwd) {
       return;
     }
     const terminalId = allocateTerminalId();
@@ -1230,7 +1237,7 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
     threadId,
     threadRef,
     openTerminal,
-    canOperateTerminal,
+    hasTerminalWriteAccess,
   ]);
 
   const activateTerminal = useCallback(
@@ -1243,7 +1250,7 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
 
   const closeTerminal = useCallback(
     (terminalId: string) => {
-      if (!canOperateTerminal) return;
+      if (!hasTerminalWriteAccess()) return;
       const fallbackExitWrite = () =>
         writeTerminal({
           environmentId: threadRef.environmentId,
@@ -1259,7 +1266,11 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
             deleteHistory: true,
           },
         });
-        if (closeResult._tag === "Failure" && !isAtomCommandInterrupted(closeResult)) {
+        if (
+          closeResult._tag === "Failure" &&
+          !isAtomCommandInterrupted(closeResult) &&
+          hasTerminalWriteAccess()
+        ) {
           await fallbackExitWrite();
         }
       })();
@@ -1273,7 +1284,7 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
       threadId,
       threadRef,
       closeTerminalMutation,
-      canOperateTerminal,
+      hasTerminalWriteAccess,
       writeTerminal,
     ],
   );
@@ -1554,6 +1565,10 @@ export default function ChatView(props: ChatViewProps) {
   } = props;
   const canOperateThread = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
+  const hasTerminalWriteAccess = useCallback(
+    () => readEnvironmentScope(environmentId, AuthTerminalOperateScope),
+    [environmentId],
+  );
   const canReadTerminal = useEnvironmentScope(environmentId, AuthTerminalReadScope);
   const draftId = routeKind === "draft" ? props.draftId : null;
   const handleNewThread = useNewThreadHandler();
@@ -2311,8 +2326,14 @@ export default function ChatView(props: ChatViewProps) {
   );
   const canReuseTerminal = activeThreadKnownSessionsRaw !== null;
   const allocateTerminalId = useCallback(
-    () => nextTerminalId(allocatableActiveTerminalIds, canReuseTerminal ? undefined : randomUUID()),
-    [allocatableActiveTerminalIds, canReuseTerminal],
+    () =>
+      nextTerminalId(
+        allocatableActiveTerminalIds,
+        canReuseTerminal && readEnvironmentScope(environmentId, AuthTerminalReadScope)
+          ? undefined
+          : randomUUID(),
+      ),
+    [allocatableActiveTerminalIds, canReuseTerminal, environmentId],
   );
   const previewPanelOpen = activeRightPanelKind === "preview" && isPreviewSupportedInRuntime();
   const rightPanelOpen = rightPanelState.isOpen;
@@ -4697,8 +4718,13 @@ export default function ChatView(props: ChatViewProps) {
   const toggleTerminalVisibility = useCallback(() => {
     if (!activeThreadRef) return;
     const nextOpen = !terminalUiState.terminalOpen;
-    if (nextOpen && !canReadTerminal && !canOperateTerminal) return;
-    if (nextOpen && canOperateTerminal && terminalUiState.terminalIds.length === 0) {
+    if (
+      nextOpen &&
+      !readEnvironmentScope(environmentId, AuthTerminalReadScope) &&
+      !hasTerminalWriteAccess()
+    )
+      return;
+    if (nextOpen && hasTerminalWriteAccess() && terminalUiState.terminalIds.length === 0) {
       if (!activeThreadId || !activeProject) {
         return;
       }
@@ -4733,9 +4759,8 @@ export default function ChatView(props: ChatViewProps) {
     environmentId,
     gitCwd,
     openTerminal,
-    canOperateTerminal,
+    hasTerminalWriteAccess,
     setTerminalOpen,
-    canReadTerminal,
     storeEnsureTerminal,
     terminalUiState.terminalIds.length,
     terminalUiState.terminalOpen,
@@ -4743,7 +4768,7 @@ export default function ChatView(props: ChatViewProps) {
   const splitTerminal = useCallback(
     (direction: "horizontal" | "vertical" = "horizontal") => {
       if (
-        !canOperateTerminal ||
+        !hasTerminalWriteAccess() ||
         !activeThreadRef ||
         hasReachedSplitLimit ||
         !activeThreadId ||
@@ -4782,7 +4807,7 @@ export default function ChatView(props: ChatViewProps) {
       allocateTerminalId,
       activeThreadRef,
       openTerminal,
-      canOperateTerminal,
+      hasTerminalWriteAccess,
       activeThreadWorktreePath,
       environmentId,
       gitCwd,
@@ -4792,7 +4817,7 @@ export default function ChatView(props: ChatViewProps) {
     ],
   );
   const createNewTerminal = useCallback(() => {
-    if (!canOperateTerminal || !activeThreadRef || !activeThreadId || !activeProject) {
+    if (!hasTerminalWriteAccess() || !activeThreadRef || !activeThreadId || !activeProject) {
       return;
     }
     const cwdForOpen = gitCwd ?? activeProject.workspaceRoot;
@@ -4821,7 +4846,7 @@ export default function ChatView(props: ChatViewProps) {
     allocateTerminalId,
     activeThreadRef,
     openTerminal,
-    canOperateTerminal,
+    hasTerminalWriteAccess,
     activeThreadWorktreePath,
     environmentId,
     gitCwd,
@@ -4829,7 +4854,7 @@ export default function ChatView(props: ChatViewProps) {
   ]);
   const closeTerminal = useCallback(
     (terminalId: string) => {
-      if (!canOperateTerminal || !activeThreadId || !activeThreadRef) return;
+      if (!hasTerminalWriteAccess() || !activeThreadId || !activeThreadRef) return;
       const fallbackExitWrite = () =>
         writeTerminal({
           environmentId,
@@ -4844,7 +4869,11 @@ export default function ChatView(props: ChatViewProps) {
             deleteHistory: true,
           },
         });
-        if (closeResult._tag === "Failure" && !isAtomCommandInterrupted(closeResult)) {
+        if (
+          closeResult._tag === "Failure" &&
+          !isAtomCommandInterrupted(closeResult) &&
+          hasTerminalWriteAccess()
+        ) {
           await fallbackExitWrite();
         }
       })();
@@ -4855,7 +4884,7 @@ export default function ChatView(props: ChatViewProps) {
       activeThreadId,
       activeThreadRef,
       closeTerminalMutation,
-      canOperateTerminal,
+      hasTerminalWriteAccess,
       environmentId,
       storeCloseTerminal,
       writeTerminal,
@@ -4872,7 +4901,7 @@ export default function ChatView(props: ChatViewProps) {
         rememberAsLastInvoked?: boolean;
       },
     ) => {
-      if (!canOperateTerminal || !activeThreadId || !activeProject || !activeThread) return;
+      if (!hasTerminalWriteAccess() || !activeThreadId || !activeProject || !activeThread) return;
       if (options?.rememberAsLastInvoked !== false) {
         setLastInvokedScriptByProjectId((current) => {
           if (current[activeProject.id] === script.id) return current;
@@ -4884,7 +4913,10 @@ export default function ChatView(props: ChatViewProps) {
         terminalUiState.activeTerminalId || activeKnownTerminalIds[0] || DEFAULT_THREAD_TERMINAL_ID;
       const isBaseTerminalBusy = runningTerminalIds.includes(baseTerminalId);
       const wantsNewTerminal = Boolean(options?.preferNewTerminal) || isBaseTerminalBusy;
-      const shouldCreateNewTerminal = wantsNewTerminal || !canReuseTerminal;
+      const shouldCreateNewTerminal =
+        wantsNewTerminal ||
+        !canReuseTerminal ||
+        !readEnvironmentScope(environmentId, AuthTerminalReadScope);
       const targetWorktreePath = options?.worktreePath ?? activeThread.worktreePath ?? null;
 
       setTerminalUiLaunchContext({
@@ -4942,6 +4974,7 @@ export default function ChatView(props: ChatViewProps) {
         return;
       }
 
+      if (!hasTerminalWriteAccess()) return;
       const writeResult = await writeTerminal({
         environmentId,
         input: {
@@ -4992,7 +5025,7 @@ export default function ChatView(props: ChatViewProps) {
       environmentId,
       openTerminal,
       openPreview,
-      canOperateTerminal,
+      hasTerminalWriteAccess,
       activeKnownTerminalIds,
       canReuseTerminal,
       allocateTerminalId,
@@ -5763,7 +5796,7 @@ export default function ChatView(props: ChatViewProps) {
     previewPanelOpen,
   ]);
   const addTerminalSurface = useCallback(() => {
-    if (!canOperateTerminal || !activeThreadRef || !activeThreadId || !activeProject) return;
+    if (!hasTerminalWriteAccess() || !activeThreadRef || !activeThreadId || !activeProject) return;
     const cwd = gitCwd ?? activeProject.workspaceRoot;
     const terminalId = allocateTerminalId();
     useRightPanelStore.getState().openTerminal(activeThreadRef, terminalId);
@@ -5789,12 +5822,12 @@ export default function ChatView(props: ChatViewProps) {
     allocateTerminalId,
     gitCwd,
     openTerminal,
-    canOperateTerminal,
+    hasTerminalWriteAccess,
   ]);
   const splitPanelTerminal = useCallback(
     (direction: "horizontal" | "vertical" = "horizontal") => {
       if (
-        !canOperateTerminal ||
+        !hasTerminalWriteAccess() ||
         !activeThreadRef ||
         !activeThreadId ||
         !activeProject ||
@@ -5832,7 +5865,7 @@ export default function ChatView(props: ChatViewProps) {
       allocateTerminalId,
       gitCwd,
       openTerminal,
-      canOperateTerminal,
+      hasTerminalWriteAccess,
     ],
   );
   const splitPanelTerminalVertical = useCallback(() => {
@@ -5850,7 +5883,11 @@ export default function ChatView(props: ChatViewProps) {
   );
   const closePanelTerminal = useCallback(
     (terminalId: string) => {
-      if (!canOperateTerminal || !activeThreadRef || activeRightPanelSurface?.kind !== "terminal")
+      if (
+        !hasTerminalWriteAccess() ||
+        !activeThreadRef ||
+        activeRightPanelSurface?.kind !== "terminal"
+      )
         return;
       void closeTerminalMutation({
         environmentId: activeThreadRef.environmentId,
@@ -5863,7 +5900,7 @@ export default function ChatView(props: ChatViewProps) {
       setTerminalFocusRequestId((value) => value + 1);
     },
     [
-      canOperateTerminal,
+      hasTerminalWriteAccess,
       activeRightPanelSurface,
       activeThreadRef,
       closeTerminalMutation,
@@ -5872,7 +5909,7 @@ export default function ChatView(props: ChatViewProps) {
   );
   const requestCloseTerminal = useCallback(
     (terminalId: string) => {
-      if (!canOperateTerminal) return;
+      if (!hasTerminalWriteAccess()) return;
       const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
       void confirmTerminalClose([label]).then((confirmed) => {
         if (confirmed && readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
@@ -5880,11 +5917,11 @@ export default function ChatView(props: ChatViewProps) {
         }
       });
     },
-    [canOperateTerminal, activeTerminalLabelsById, closeTerminal, environmentId],
+    [hasTerminalWriteAccess, activeTerminalLabelsById, closeTerminal, environmentId],
   );
   const requestClosePanelTerminal = useCallback(
     (terminalId: string) => {
-      if (!canOperateTerminal) return;
+      if (!hasTerminalWriteAccess()) return;
       const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
       void confirmTerminalClose([label]).then((confirmed) => {
         if (confirmed && readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
@@ -5892,7 +5929,7 @@ export default function ChatView(props: ChatViewProps) {
         }
       });
     },
-    [canOperateTerminal, activeTerminalLabelsById, closePanelTerminal, environmentId],
+    [hasTerminalWriteAccess, activeTerminalLabelsById, closePanelTerminal, environmentId],
   );
   const activateRightPanelSurface = useCallback(
     (surface: RightPanelSurface) => {
