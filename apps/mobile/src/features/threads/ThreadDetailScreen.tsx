@@ -94,7 +94,10 @@ import { useEnvironmentQuery } from "../../state/query";
 import { threadDevicePreviews } from "../devices/threadDevicePreviews";
 import type { QueuedThreadMessage } from "../../state/thread-outbox-model";
 import { scopedThreadKey } from "../../lib/scopedEntities";
-import { setThreadComposerError, threadComposerErrorAtom } from "../../state/thread-composer-error";
+import {
+  clearThreadComposerError,
+  threadComposerErrorsAtom,
+} from "../../state/thread-composer-error";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useDelayedStatus } from "../../lib/useDelayedStatus";
@@ -365,7 +368,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const navigationHeaderHeight = useContext(HeaderHeightContext) || insets.top + 44;
   const agentLabel = `${props.selectedThread.modelSelection.instanceId} agent`;
   const selectedThreadKey = scopedThreadKey(props.environmentId, props.selectedThread.id);
-  const composerError = useAtomValue(threadComposerErrorAtom(selectedThreadKey));
+  const composerError = useAtomValue(threadComposerErrorsAtom)[selectedThreadKey]?.message ?? null;
   const queuedCount = useThreadQueuedCount({
     environmentId: props.environmentId,
     threadId: props.selectedThread.id,
@@ -1202,7 +1205,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                   >
                     <ComposerErrorNotice
                       message={composerError}
-                      onDismiss={() => setThreadComposerError(selectedThreadKey, null)}
+                      onDismiss={() => clearThreadComposerError(selectedThreadKey)}
                     />
                   </Animated.View>
                 ) : null}

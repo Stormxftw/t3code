@@ -96,7 +96,7 @@ import {
   useQueuedRunEdit,
 } from "./queued-run-edit";
 import { setPendingConnectionError } from "../state/use-remote-environment-registry";
-import { setThreadComposerError } from "./thread-composer-error";
+import { clearThreadComposerError, setThreadComposerError } from "./thread-composer-error";
 import {
   useSelectedThreadProjection,
   useSelectedThreadVisibleTurnItems,
@@ -673,7 +673,7 @@ export function useThreadComposerState() {
       const metadata = makeQueuedMessageMetadata();
       const messageId = MessageId.make(metadata.messageId);
       // A new send supersedes the reason the previous one bounced back.
-      setThreadComposerError(threadKey, null);
+      clearThreadComposerError(threadKey);
       // Enqueue publishes the queued atom synchronously (the durable write
       // happens behind it), so clearing the draft here gives send feedback on
       // the tap frame instead of after file I/O. If the write fails the message

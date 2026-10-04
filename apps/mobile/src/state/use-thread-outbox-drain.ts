@@ -80,7 +80,7 @@ import {
   useThreadOutboxMessages,
   useThreadOutboxShellStatuses,
 } from "./use-thread-outbox";
-import { setThreadComposerError } from "./thread-composer-error";
+import { clearThreadComposerError, setThreadComposerError } from "./thread-composer-error";
 import { useRemoteConnectionStatus } from "./use-remote-environment-registry";
 
 // Ordinary offline behavior (a socket dropping mid-request, a retryable
@@ -280,6 +280,12 @@ export async function completeQueuedMessageDelivery(
   queuedMessage: QueuedThreadMessage,
   deliveryRevision: number,
 ): Promise<"removed" | "edited" | "failed"> {
+  // The server took it after all: an error left by an earlier failed recovery
+  // of this same message no longer applies.
+  clearThreadComposerError(
+    scopedThreadKey(queuedMessage.environmentId, queuedMessage.threadId),
+    queuedMessage.messageId,
+  );
   try {
     await removeDeliveredCloudQueuedMessage(queuedMessage).catch((error) => {
       console.warn("[thread-outbox] could not update sign-out snapshot after delivery", {
@@ -469,6 +475,7 @@ export async function restoreRejectedQueuedMessage(
       setThreadComposerError(
         threadKey,
         `Remove attachments from the draft before restoring this message. Messages can contain at most ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} attachments.`,
+        queuedMessage.messageId,
       );
       return "blocked";
     }
@@ -547,7 +554,7 @@ export async function restoreRejectedQueuedMessage(
         reason: message,
       });
     } else {
-      setThreadComposerError(threadKey, message);
+      setThreadComposerError(threadKey, message, queuedMessage.messageId);
     }
     return "restored";
   } catch (error) {
@@ -565,6 +572,7 @@ export async function restoreRejectedQueuedMessage(
     setThreadComposerError(
       threadKey,
       error instanceof Error ? error.message : "The unsent message could not be restored.",
+      queuedMessage.messageId,
     );
     return "retry";
   }
