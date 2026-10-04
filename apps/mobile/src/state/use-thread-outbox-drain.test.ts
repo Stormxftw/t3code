@@ -729,6 +729,37 @@ describe("thread outbox recovery rollback", () => {
     ).toEqual({ kind: "failed", message, reason: "rejected by server" });
   });
 
+  it("drops an earlier recovery error once a rejected new task is restored", async () => {
+    const message: QueuedThreadMessage = {
+      ...queuedMessage({ messageId: "message-creation-retried", text: "new task text" }),
+      modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.6-sol" },
+      creation: {
+        projectId: ProjectId.make("project-1"),
+        workspaceMode: "local",
+        branch: null,
+        worktreePath: null,
+      },
+    };
+    await harness.manager.enqueue(message);
+    harness.draftFile.setWriteError(new Error("disk full"));
+    await expect(restoreRejectedQueuedMessage(message, "rejected by server")).resolves.toBe(
+      "retry",
+    );
+    const threadKey = `${message.environmentId}:${message.threadId}`;
+    expect(appAtomRegistry.get(threadComposerErrorsAtom)[threadKey]?.messageId).toBe(
+      message.messageId,
+    );
+
+    harness.draftFile.setWriteError(null);
+    await expect(restoreRejectedQueuedMessage(message, "rejected by server")).resolves.toBe(
+      "restored",
+    );
+
+    // The failure card carries the reason now; nothing stale sits above it.
+    expect(appAtomRegistry.get(threadComposerErrorsAtom)).toEqual({});
+    expect(appAtomRegistry.get(pendingThreadCreationOutcomesAtom)[threadKey]?.kind).toBe("failed");
+  });
+
   it("keeps a failed outcome until its thread screen consumes it", async () => {
     const message: QueuedThreadMessage = {
       ...queuedMessage({ messageId: "message-creation-kept", text: "new task text" }),

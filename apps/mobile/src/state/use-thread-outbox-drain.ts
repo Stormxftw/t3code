@@ -556,6 +556,9 @@ export async function restoreRejectedQueuedMessage(
     // must never be rolled back.
     rollback = null;
     if (queuedMessage.creation) {
+      // The failure card shows the reason, so an error left by an earlier
+      // failed attempt at this recovery no longer applies.
+      withdrawError();
       // The thread screen for this creation is likely open; it reads the
       // outcome to offer reopening the restored draft, and shows the reason.
       recordPendingThreadCreationOutcome({
