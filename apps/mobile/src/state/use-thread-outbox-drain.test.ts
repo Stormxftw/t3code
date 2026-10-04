@@ -19,7 +19,6 @@ const harness = vi.hoisted(() => ({
   removePersistedFile: vi.fn(async () => undefined),
   removeOutboxMessage: vi.fn(async (_message: QueuedThreadMessage) => undefined),
   prepareTurnAttachments: vi.fn<typeof import("../lib/attachmentUpload").prepareTurnAttachments>(),
-  setPendingConnectionError: vi.fn(),
   draftFile: (() => {
     let document = "";
     let writeError: Error | null = null;
@@ -106,7 +105,6 @@ vi.mock("./use-thread-outbox", async () => {
 });
 
 vi.mock("./use-remote-environment-registry", () => ({
-  setPendingConnectionError: harness.setPendingConnectionError,
   useRemoteConnectionStatus: () => ({ connectedEnvironments: [] }),
 }));
 
@@ -137,6 +135,7 @@ import {
   clearPendingThreadCreationOutcome,
   pendingThreadCreationOutcomesAtom,
 } from "./pending-thread-creation";
+import { threadComposerErrorAtom } from "./thread-composer-error";
 import type { QueuedThreadMessage } from "./thread-outbox-model";
 import * as composerDrafts from "./use-composer-drafts";
 import { recoverFailedThreadDraft } from "./recover-failed-thread-draft";
@@ -209,11 +208,11 @@ afterEach(() => {
   appAtomRegistry.set(composerDrafts.composerCloudDraftsAtom, { accountId: null, signedOut: {} });
   appAtomRegistry.set(editingQueuedMessageIdsAtom, {});
   appAtomRegistry.set(pendingThreadCreationOutcomesAtom, {});
+  appAtomRegistry.set(threadComposerErrorAtom("environment-1:thread-1"), null);
   harness.draftFile.setWriteError(null);
   harness.removePersistedFile.mockClear();
   harness.removeOutboxMessage.mockClear();
   harness.prepareTurnAttachments.mockReset();
-  harness.setPendingConnectionError.mockClear();
 });
 
 describe("thread outbox attachment preparation", () => {
@@ -697,7 +696,10 @@ describe("thread outbox recovery rollback", () => {
       },
     });
     expect(remainingMessages()).toEqual([]);
-    expect(harness.setPendingConnectionError).toHaveBeenCalledWith("rejected by server");
+    // The creation's failure card shows the reason; the composer is hidden.
+    expect(
+      appAtomRegistry.get(threadComposerErrorAtom(`${message.environmentId}:${message.threadId}`)),
+    ).toBeNull();
     // The thread screen opened for this creation reads the failure from here.
     expect(
       appAtomRegistry.get(pendingThreadCreationOutcomesAtom)[
@@ -734,6 +736,10 @@ describe("thread outbox recovery rollback", () => {
     await expect(restoreRejectedQueuedMessage(message, "rejected")).resolves.toBe("restored");
 
     expect(appAtomRegistry.get(pendingThreadCreationOutcomesAtom)).toEqual({});
+    // The thread screen shows why the message came back into the composer.
+    expect(
+      appAtomRegistry.get(threadComposerErrorAtom(`${message.environmentId}:${message.threadId}`)),
+    ).toBe("rejected");
   });
 
   it("rolls a failed recovery merge back so the retry cannot duplicate the text", async () => {
@@ -759,6 +765,6 @@ describe("thread outbox recovery rollback", () => {
       "typed offline\n\nqueued text",
     );
     expect(remainingMessages()).toEqual([]);
-    expect(harness.setPendingConnectionError).toHaveBeenCalledWith("too large");
+    expect(appAtomRegistry.get(threadComposerErrorAtom(draftKey))).toBe("too large");
   });
 });

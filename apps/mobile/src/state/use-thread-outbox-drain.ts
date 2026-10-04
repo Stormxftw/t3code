@@ -80,10 +80,8 @@ import {
   useThreadOutboxMessages,
   useThreadOutboxShellStatuses,
 } from "./use-thread-outbox";
-import {
-  setPendingConnectionError,
-  useRemoteConnectionStatus,
-} from "./use-remote-environment-registry";
+import { setThreadComposerError } from "./thread-composer-error";
+import { useRemoteConnectionStatus } from "./use-remote-environment-registry";
 
 // Ordinary offline behavior (a socket dropping mid-request, a retryable
 // attachment upload failure) must not spam `console.warn` on every backoff
@@ -438,6 +436,7 @@ export async function restoreRejectedQueuedMessage(
   message: string,
 ): Promise<"restored" | "deferred" | "blocked" | "retry"> {
   const draftKey = recoveryDraftKey(queuedMessage);
+  const threadKey = scopedThreadKey(queuedMessage.environmentId, queuedMessage.threadId);
   // Set once the merge publishes, cleared once the queued message is removed.
   // The catch below uses it to take the merged content back out, so a retry
   // after a mid-recovery failure cannot append the recovered text again.
@@ -467,7 +466,8 @@ export async function restoreRejectedQueuedMessage(
       (attachment) => !existingAttachmentIds.has(attachment.id),
     ).length;
     if (existingAttachmentIds.size + addedAttachmentCount > PROVIDER_SEND_TURN_MAX_ATTACHMENTS) {
-      setPendingConnectionError(
+      setThreadComposerError(
+        threadKey,
         `Remove attachments from the draft before restoring this message. Messages can contain at most ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} attachments.`,
       );
       return "blocked";
@@ -540,14 +540,15 @@ export async function restoreRejectedQueuedMessage(
     rollback = null;
     if (queuedMessage.creation) {
       // The thread screen for this creation is likely open; it reads the
-      // outcome to offer reopening the restored draft.
+      // outcome to offer reopening the restored draft, and shows the reason.
       recordPendingThreadCreationOutcome({
         kind: "failed",
         message: queuedMessage,
         reason: message,
       });
+    } else {
+      setThreadComposerError(threadKey, message);
     }
-    setPendingConnectionError(message);
     return "restored";
   } catch (error) {
     if (rollback !== null) {
@@ -561,7 +562,8 @@ export async function restoreRejectedQueuedMessage(
       );
     }
     console.warn("[thread-outbox] failed to restore an undeliverable message", error);
-    setPendingConnectionError(
+    setThreadComposerError(
+      threadKey,
       error instanceof Error ? error.message : "The unsent message could not be restored.",
     );
     return "retry";
