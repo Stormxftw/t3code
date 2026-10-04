@@ -480,6 +480,13 @@ export async function restoreRejectedQueuedMessage(
       return "blocked";
     }
 
+    // Shown before the merge publishes the text, so a resend of that text,
+    // which can happen while this recovery still awaits persistence, clears
+    // it. Withdrawn below wherever the recovery backs out.
+    const withdrawError = () => clearThreadComposerError(threadKey, queuedMessage.messageId);
+    if (!queuedMessage.creation) {
+      setThreadComposerError(threadKey, message, queuedMessage.messageId);
+    }
     let mergedDraft: ComposerDraft;
     try {
       stampRecoveryDraftProject(queuedMessage, draftKey);
@@ -499,6 +506,7 @@ export async function restoreRejectedQueuedMessage(
       rollback = { snapshot: originalDraft, merged: mergedDraft };
     }
     if (appAtomRegistry.get(editingQueuedMessageIdsAtom)[queuedMessage.messageId]) {
+      withdrawError();
       await undoComposerDraftMerge(draftKey, originalDraft, mergedDraft);
       return "deferred";
     }
@@ -527,6 +535,7 @@ export async function restoreRejectedQueuedMessage(
       !(await confirmThreadOutboxMessageQueued(queuedMessage)) ||
       appAtomRegistry.get(editingQueuedMessageIdsAtom)[queuedMessage.messageId]
     ) {
+      withdrawError();
       await undoComposerDraftMerge(draftKey, originalDraft, restoredDraft);
       return "deferred";
     }
@@ -539,6 +548,7 @@ export async function restoreRejectedQueuedMessage(
         () => !appAtomRegistry.get(editingQueuedMessageIdsAtom)[queuedMessage.messageId],
       ))
     ) {
+      withdrawError();
       await undoComposerDraftMerge(draftKey, originalDraft, restoredDraft);
       return "deferred";
     }
@@ -553,8 +563,6 @@ export async function restoreRejectedQueuedMessage(
         message: queuedMessage,
         reason: message,
       });
-    } else {
-      setThreadComposerError(threadKey, message, queuedMessage.messageId);
     }
     return "restored";
   } catch (error) {

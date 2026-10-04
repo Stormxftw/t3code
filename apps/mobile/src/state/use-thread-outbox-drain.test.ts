@@ -135,7 +135,11 @@ import {
   clearPendingThreadCreationOutcome,
   pendingThreadCreationOutcomesAtom,
 } from "./pending-thread-creation";
-import { setThreadComposerError, threadComposerErrorsAtom } from "./thread-composer-error";
+import {
+  clearThreadComposerError,
+  setThreadComposerError,
+  threadComposerErrorsAtom,
+} from "./thread-composer-error";
 import type { QueuedThreadMessage } from "./thread-outbox-model";
 import * as composerDrafts from "./use-composer-drafts";
 import { recoverFailedThreadDraft } from "./recover-failed-thread-draft";
@@ -757,6 +761,42 @@ describe("thread outbox recovery rollback", () => {
     expect(
       appAtomRegistry.get(threadComposerErrorsAtom)[`${message.environmentId}:${message.threadId}`],
     ).toEqual({ message: "rejected", messageId: message.messageId });
+  });
+
+  it("leaves no error when the restored text is resent before recovery finishes", async () => {
+    const message = queuedMessage({ messageId: "message-resent", text: "resend me" });
+    const threadKey = `${message.environmentId}:${message.threadId}`;
+    await harness.manager.enqueue(message);
+    // The user sees the restored text as soon as the merge publishes it and
+    // sends it again while the recovery is still awaiting persistence.
+    const unsubscribe = appAtomRegistry.subscribe(composerDrafts.composerDraftsAtom, (drafts) => {
+      if (drafts[threadKey]?.text === "resend me") {
+        unsubscribe();
+        clearThreadComposerError(threadKey);
+        void composerDrafts.clearComposerDraftContent(threadKey);
+      }
+    });
+
+    await expect(restoreRejectedQueuedMessage(message, "rejected")).resolves.toBe("restored");
+
+    expect(appAtomRegistry.get(threadComposerErrorsAtom)).toEqual({});
+  });
+
+  it("withdraws the error when an edit makes the recovery back out", async () => {
+    const message = queuedMessage({ messageId: "message-edited-mid-recovery", text: "edit me" });
+    const threadKey = `${message.environmentId}:${message.threadId}`;
+    await harness.manager.enqueue(message);
+    const unsubscribe = appAtomRegistry.subscribe(composerDrafts.composerDraftsAtom, (drafts) => {
+      if (drafts[threadKey]?.text === "edit me") {
+        unsubscribe();
+        appAtomRegistry.set(editingQueuedMessageIdsAtom, { [message.messageId]: true });
+      }
+    });
+
+    await expect(restoreRejectedQueuedMessage(message, "rejected")).resolves.toBe("deferred");
+
+    expect(appAtomRegistry.get(threadComposerErrorsAtom)).toEqual({});
+    expect(remainingMessages()).toEqual([message]);
   });
 
   it("rolls a failed recovery merge back so the retry cannot duplicate the text", async () => {
