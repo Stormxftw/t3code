@@ -1,5 +1,16 @@
 # T3 Code
 
+## Fork experiment: optional Squadr Command field
+
+On `experiment/squadr-command-field`, read `CURRENT_MILESTONE.md` and
+`docs/plans/squadr-command-field.md` before extending the fork. The user wants to
+empower T3 with an optional overview; preserve T3's normal experience and upstream
+architecture. Keep new work within the current milestone, preserve upstream
+notices, and push experiment work only to the personal fork. The initial request
+authorizes fork setup and planning; it does not implement the future UI milestones.
+Do not delegate to subagents unless the user explicitly requests it. Upstream
+guidance below continues to apply.
+
 T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs and agents (Codex, Claude Code, Cursor, Grok, OpenCode, Antigravity) and serves web, desktop, and mobile clients.
 
 You can think of T3 Code as an open source "bring-your-own-subscription" alternative to apps like Claude Desktop, Codex App, Cursor Glass and Conductor.
