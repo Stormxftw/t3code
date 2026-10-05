@@ -1,6 +1,6 @@
 # Squadr Command field for T3 Code
 
-Status: fork experiment and implementation plan. No Command field feature is implemented yet.
+Status: M0 fork setup and Windows baseline verification complete. M1 is proposed; no Command field feature is implemented yet.
 Baseline: `pingdotgg/t3code` at `efecd3cf8bcec3d1891b5f5a27dc2f6d797c6448` (2026-10-04).
 Branch: `experiment/squadr-command-field` in `Stormxftw/t3code`.
 
@@ -33,24 +33,24 @@ Add a quiet, optional way to survey work across projects and reach the right thr
 
 These were inspected at the pinned baseline; recheck them when upgrading upstream.
 
-| Concern | Existing code to reuse | Proposed boundary |
-| --- | --- | --- |
-| Navigation | `apps/web/src/routes/_chat.tsx`, `_chat.index.tsx`, `threadRoutes.ts`, `components/ThreadRouteView.tsx` | Add a sibling field route and a small navigation entry. Preserve the layout's draft-to-thread mounting behavior and the current index route. Use `buildThreadRouteParams` to enter the normal thread route. |
-| Cards and project grouping | `apps/web/src/state/entities.ts`, `state/environments.ts`, `sidebarProjectGrouping.ts` | Read `useProjects`, `useThreadShells` and scoped references from the existing state owners. Reuse existing grouping where compatible; do not merge environments by path alone. |
-| Live status and excerpts | `packages/contracts/src/orchestrationV2.ts` (`OrchestrationV2ThreadShell`), `packages/client-runtime/src/state/shell.ts` | Use existing status, `latestVisibleMessage`, timestamps and connection freshness. Keep bounded excerpts and expose detail through the normal thread route. |
-| Focus and shortcuts | `apps/web/src/keybindings.ts`, `packages/contracts/src/keybindings.ts`, `lib/terminalFocus.ts`, `lib/editableFocus.ts`, `lib/previewFocus.ts` | Reuse the matcher, hint formatting and focus guards. Existing thread-jump commands already have sidebar semantics; do not silently repoint them to canvas positions. |
-| Preferences | `apps/web/src/hooks/useSettings.ts`, `routes/settings.appearance.tsx` | Extend the current client settings model. Do not create another settings store or migrate server data. |
-| UI and accessibility | `apps/web/src/components/ui`, existing sidebar status/accessibility helpers | Use normal DOM sections/cards with keyboard and pointer access. Avoid a graph framework or custom terminal/chat renderer. |
+| Concern                    | Existing code to reuse                                                                                                                        | Proposed boundary                                                                                                                                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Navigation                 | `apps/web/src/routes/_chat.tsx`, `_chat.index.tsx`, `threadRoutes.ts`, `components/ThreadRouteView.tsx`                                       | Add a sibling field route and a small navigation entry. Preserve the layout's draft-to-thread mounting behavior and the current index route. Use `buildThreadRouteParams` to enter the normal thread route. |
+| Cards and project grouping | `apps/web/src/state/entities.ts`, `state/environments.ts`, `sidebarProjectGrouping.ts`                                                        | Read `useProjects`, `useThreadShells` and scoped references from the existing state owners. Reuse existing grouping where compatible; do not merge environments by path alone.                              |
+| Live status and excerpts   | `packages/contracts/src/orchestrationV2.ts` (`OrchestrationV2ThreadShell`), `packages/client-runtime/src/state/shell.ts`                      | Use existing status, `latestVisibleMessage`, timestamps and connection freshness. Keep bounded excerpts and expose detail through the normal thread route.                                                  |
+| Focus and shortcuts        | `apps/web/src/keybindings.ts`, `packages/contracts/src/keybindings.ts`, `lib/terminalFocus.ts`, `lib/editableFocus.ts`, `lib/previewFocus.ts` | Reuse the matcher, hint formatting and focus guards. Existing thread-jump commands already have sidebar semantics; do not silently repoint them to canvas positions.                                        |
+| Preferences                | `apps/web/src/hooks/useSettings.ts`, `routes/settings.appearance.tsx`                                                                         | Extend the current client settings model. Do not create another settings store or migrate server data.                                                                                                      |
+| UI and accessibility       | `apps/web/src/components/ui`, existing sidebar status/accessibility helpers                                                                   | Use normal DOM sections/cards with keyboard and pointer access. Avoid a graph framework or custom terminal/chat renderer.                                                                                   |
 
 The likely feature home is `apps/web/src/components/command-field/`, with a small pure selector/order helper. Extract only what the implementation needs. No speculative provider abstraction or new server endpoint is planned.
 
 ## Ordered milestones
 
-### M0 — establish the experiment (current request)
+### M0 — establish the experiment (completed 2026-10-04)
 
 Create and verify the fork and branch, preserve upstream ancestry, install the unchanged baseline, record a bounded startup/build check, and publish this plan. Keep test data and logs local and ignored. Do not replace the installed desktop app.
 
-The authoritative setup evidence and any unresolved baseline failures are in [CURRENT_MILESTONE.md](../../CURRENT_MILESTONE.md). Repository creation does not establish that the app builds or that provider interaction works.
+The authoritative setup evidence and verification limits are in [CURRENT_MILESTONE.md](../../CURRENT_MILESTONE.md). Frozen install, scoped web build and isolated server/proxy HTTP checks passed. The test process was stopped and cleanup verified. Provider interaction and visual acceptance have not been tested in this fork.
 
 ### M1 — one complete survey-to-thread loop
 
