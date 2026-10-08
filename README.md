@@ -1,3 +1,35 @@
+# Squadr — experimental T3 Code fork
+
+> [!IMPORTANT]
+> **This is Strugglehugs' personal experiment fork, not the official T3 Code repository.**
+>
+> **T3 Code is the work of [T3 Tools and the upstream T3 Code contributors](https://github.com/pingdotgg/t3code). I did not create T3 Code.** My work here is limited to the Squadr experiment described below.
+
+## What I'm exploring
+
+**Squadr Command field** is an experiment in adding an optional overview of projects and threads to T3 Code. The goal is to make it easier to find a thread, open it in T3's existing workspace, and return to the overview while preserving T3's normal interface and architecture.
+
+## Current public status
+
+**Design and baseline stage.** The published experiment branch currently contains the plan, milestone notes, and Windows baseline checks. The Command field UI has not been published on that branch, and there is no separate Squadr release to install.
+
+- [Explore the experiment branch](https://github.com/Stormxftw/t3code/tree/experiment/squadr-command-field)
+- [Read the experiment plan](https://github.com/Stormxftw/t3code/blob/experiment/squadr-command-field/docs/plans/squadr-command-field.md)
+- [Check the published milestone and baseline evidence](https://github.com/Stormxftw/t3code/blob/experiment/squadr-command-field/CURRENT_MILESTONE.md)
+
+## Looking for the original T3 Code?
+
+Visit **[pingdotgg/t3code](https://github.com/pingdotgg/t3code)** for the original project, **[t3.codes](https://t3.codes)** for its website, or **[upstream releases](https://github.com/pingdotgg/t3code/releases)** for official downloads.
+
+This fork is an independent experiment. Credit for the underlying application belongs to T3 Tools and the upstream contributors. Their copyright and [MIT license](./LICENSE) are retained.
+
+---
+
+<details>
+<summary><strong>Original T3 Code README — upstream documentation</strong></summary>
+
+The text below is preserved from upstream. References to "we" and "our" refer to the T3 Code team. Its installation commands and download links are for upstream T3 Code, not a Squadr release.
+
 # T3 Code
 
 T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
@@ -132,3 +164,5 @@ Read [CONTRIBUTING.md](./CONTRIBUTING.md) before reporting a bug or opening a PR
 Have a feature request? Start an [Ideas discussion](https://github.com/pingdotgg/t3code/discussions/categories/ideas).
 
 Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).
+
+</details>
